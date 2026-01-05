@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Send, Shield, Info } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ interface Message {
   timestamp: Date;
 }
 
+// Default demo conversation for quick demos (kept for non-fresh chats)
 const initialMessages: Message[] = [
   {
     id: 1,
@@ -33,9 +35,16 @@ const initialMessages: Message[] = [
 ];
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const location = useLocation();
+  const state = location.state as { match?: any; freshChat?: boolean } | null;
+
+  // If this chat was opened as a fresh chat (from Recovery), start with an empty message list
+  const [messages, setMessages] = useState<Message[]>(state?.freshChat ? [] : initialMessages);
   const [input, setInput] = useState("");
 
+  useEffect(() => {
+    if (state?.freshChat) setMessages([]);
+  }, [state?.freshChat]);
   const handleSend = () => {
     if (!input.trim()) return;
 

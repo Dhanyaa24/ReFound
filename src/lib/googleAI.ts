@@ -40,7 +40,11 @@ export async function generateVerificationQuestions(topMatch: any, allMatches: a
     });
 
     if (!res.ok) {
-      console.warn("Google AI returned non-ok status", res.status);
+      const text = await res.text();
+      console.warn("Google AI returned non-ok status", res.status, text);
+      if (res.status === 403) {
+        console.warn("403 Forbidden from Generative API — common causes: API not enabled, billing disabled, or API key restrictions (e.g. HTTP referrer restrictions). For browser requests, prefer proxying the request from a server to avoid exposing the key in client code or whitelist your dev origin in the key's HTTP referrer restrictions.");
+      }
       return defaultQuestions;
     }
 
@@ -103,7 +107,11 @@ export async function generateImageDescription(analysis: any, topMatch?: any): P
     });
 
     if (!res.ok) {
-      console.warn('Image description generation failed', res.status);
+      const text = await res.text();
+      console.warn('Image description generation failed', res.status, text);
+      if (res.status === 403) {
+        console.warn("403 Forbidden from Generative API — check that the Generative Language API is enabled for your project, billing is active, and that the API key's restrictions (if any) allow this origin. Best practice: don't call the model directly from client-side code with an unrestricted key; instead proxy through a server-side endpoint.");
+      }
       return fallback;
     }
 

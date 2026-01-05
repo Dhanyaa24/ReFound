@@ -31,7 +31,7 @@ export default function FindLost() {
 
       if (image) {
         const { analyzeImageWithVision } = await import("@/lib/googleVision");
-        const { findMatches } = await import("@/lib/matcher");
+        const { findMatchesAsync } = await import("@/lib/matcher");
         const { getImageEmbeddingFromDataUrl } = await import("@/lib/embeddings");
 
         analysis = await analyzeImageWithVision(image);
@@ -43,11 +43,17 @@ export default function FindLost() {
           console.warn("Failed to compute embedding for query image", e);
         }
 
-        matches = findMatches(analysis, description);
+        // Include the original image data URL so the matcher can attempt exact-image equality checks
+        (analysis as any).imageDataUrl = image;
+
+        matches = await findMatchesAsync(analysis, description);
+        // Debug: log top matches returned for this query
+        // eslint-disable-next-line no-console
+        console.info("FindLost: matches", matches.slice(0, 3).map((m: any) => ({ id: m.item.id, score: m.score, reason: m.reason })));
       } else {
         // If no image, we can try to match by description only (not implemented: uses description token matching)
-        const { findMatches } = await import("@/lib/matcher");
-        matches = findMatches({ labels: [], webEntities: [], raw: {} }, description);
+        const { findMatchesAsync } = await import("@/lib/matcher");
+        matches = await findMatchesAsync({ labels: [], webEntities: [], raw: {} }, description);
       }
 
       navigate("/matching", { state: { type: "lost", analysis, matches } });
@@ -119,7 +125,6 @@ export default function FindLost() {
           </p>
         </div>
 
-        {/* Submit Button */}
         <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
           <Button
             variant="hero"

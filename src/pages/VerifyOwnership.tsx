@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Shield, Lock } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
@@ -29,9 +29,18 @@ const verificationQuestions = [
 
 export default function VerifyOwnership() {
   const navigate = useNavigate();
-  const location = (window as any).__LOCATION__ || undefined;
-  // Prefer questions passed via navigation state, otherwise use defaults
-  const passed = (location && location.state) || (window.history && (window.history.state && window.history.state?.state)) || undefined;
+  const location = useLocation();
+  // Prefer questions passed via navigation state, otherwise fall back to sessionStorage or history state
+  const passedFromNav = (location && (location as any).state) || undefined;
+  const passedFromSession = (() => {
+    try {
+      const raw = sessionStorage.getItem('lastMatch');
+      return raw ? JSON.parse(raw) : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  })();
+  const passed = passedFromNav || passedFromSession || (window.history && (window.history.state && window.history.state?.state)) || undefined;
   const questionsFromState = passed?.questions as any[] | undefined;
 
   const questions = questionsFromState && questionsFromState.length > 0 ? questionsFromState : verificationQuestions;
@@ -39,21 +48,33 @@ export default function VerifyOwnership() {
   const passedMatch = passed?.match;
   const risk = passed?.risk as "high" | "low" | undefined;
 
+  // Debug: when verification loads, show what state we received
+  // eslint-disable-next-line no-console
+  console.info('VerifyOwnership loaded with', { passedMatch, risk, hasAnalysis: Boolean(passed?.analysis) });
+
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [descConfirmed, setDescConfirmed] = useState(false);
+  const hasAnalysis = Boolean(passed && passed.analysis);
+  const [descConfirmed, setDescConfirmed] = useState(!hasAnalysis);
   const [descText, setDescText] = useState<string | null>(null);
 
   const allAnswered = questions.every(
     (q: any) => answers[q.id]?.trim().length > 0
   );
 
+  // Questions are optional in demo mode — user can continue without answering them.
+  const questionsAreRequired = false;
+
   const handleSubmit = async () => {
     setIsLoading(true);
     // Simulate verification
     await new Promise((resolve) => setTimeout(resolve, 1500));
     setIsLoading(false);
-    navigate("/recovery");
+    // Navigate to recovery and pass through the match and analysis so recovery knows what to show
+    const payload = { match: passedMatch, risk, analysis: passed?.analysis, verificationAnswers: answers, descText };
+    // eslint-disable-next-line no-console
+    console.info("VerifyOwnership: verification passed, navigating to recovery with", payload);
+    navigate("/recovery", { state: payload });
   };
 
   return (
@@ -107,27 +128,30 @@ export default function VerifyOwnership() {
           </div>
         </div>
 
-        {/* Questions */}
-        <div className="space-y-5">
-          {questions.map((q: any, index: number) => (
-            <div
-              key={q.id}
-              className="space-y-2 animate-fade-in"
-              style={{ animationDelay: `${(index + 1) * 0.1}s` }}
-            >
-              <Label className="text-sm font-medium">
-                {index + 1}. {q.question}
-              </Label>
-              <Input
-                placeholder={q.placeholder}
-                value={answers[q.id] || ""}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                }
-                className="h-12 bg-secondary/30"
-              />
-            </div>
-          ))}
+{/* Questions (optional) */}
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground">These verification questions are optional for demo; you can skip them and continue.</div>
+          <div className="space-y-5 mt-2">
+            {questions.map((q: any, index: number) => (
+              <div
+                key={q.id}
+                className="space-y-2 animate-fade-in"
+                style={{ animationDelay: `${(index + 1) * 0.1}s` }}
+              >
+                <Label className="text-sm font-medium">
+                  {index + 1}. {q.question}
+                </Label>
+                <Input
+                  placeholder={q.placeholder}
+                  value={answers[q.id] || ""}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                  }
+                  className="h-12 bg-secondary/30"
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Trust Notice */}
@@ -144,7 +168,8 @@ export default function VerifyOwnership() {
             variant="hero"
             size="xl"
             className="w-full"
-            disabled={!allAnswered || isLoading || !descConfirmed}
+            // Questions are optional; only require the AI description confirmation when present.
+            disabled={isLoading || (hasAnalysis && !descConfirmed)}
             onClick={handleSubmit}
           >
             {isLoading ? (

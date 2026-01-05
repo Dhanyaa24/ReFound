@@ -12,6 +12,7 @@ import MatchResult from "./pages/MatchResult";
 import VerifyOwnership from "./pages/VerifyOwnership";
 import Recovery from "./pages/Recovery";
 import Chat from "./pages/Chat";
+import SavedFound from "./pages/SavedFound";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/match-result" element={<MatchResult />} />
           <Route path="/verify-ownership" element={<VerifyOwnership />} />
           <Route path="/recovery" element={<Recovery />} />
+          <Route path="/saved-found" element={<SavedFound />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

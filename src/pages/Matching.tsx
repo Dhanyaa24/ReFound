@@ -23,29 +23,29 @@ export default function Matching() {
 
     // Navigate to results after animation
     const timeout = setTimeout(async () => {
-      // If the previous step provided concrete matches, decide next step based on risk.
+      // If the previous step provided concrete matches, pass matches and risk to the results page.
       if (state && (state as any).matches) {
         const matches = (state as any).matches;
         try {
           const { assessRisk } = await import("@/lib/risk");
-          const risk = assessRisk(matches);
-          if (risk === "high") {
-            // Generate verification questions and navigate to verification flow
-            const topMatch = matches[0];
+          const risk = await assessRisk(matches);
+
+          // Attempt to pre-generate verification questions (best-effort)
+          let questions: any = undefined;
+          try {
             const { generateVerificationQuestions } = await import("@/lib/googleAI");
-            const questions = await generateVerificationQuestions(topMatch, matches);
-            const analysis = (state as any).analysis;
-            navigate('/verify-ownership', { state: { questions, match: topMatch, risk, analysis } });
-            return;
-          } else {
-            // Low risk => straight to recovery (skip extra verification)
-            const analysis = (state as any).analysis;
-            navigate('/recovery', { state: { match: matches[0], risk, analysis } });
-            return;
+            questions = await generateVerificationQuestions(matches[0], matches);
+          } catch (e) {
+            console.warn("Question generation failed", e);
           }
+
+          const analysis = (state as any).analysis;
+          // Always show MatchResult first so users can see details and choose to verify or continue
+          navigate('/match-result', { state: { ...state, matches, risk, questions, analysis } });
+          return;
         } catch (e) {
-          console.warn("Risk assessment or question generation failed", e);
-          // Fall back to showing results
+          console.warn("Risk assessment failed", e);
+          // Fall back to showing results without risk/questions
           navigate('/match-result', { state: { ...state, risk: undefined } });
           return;
         }

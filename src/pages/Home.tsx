@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Search, Upload, Compass } from "lucide-react";
+import { Search, Upload, Compass, Image } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 export default function Home() {
   const navigate = useNavigate();
@@ -57,6 +57,26 @@ export default function Home() {
               Found something that doesn't belong to you? Upload it to our platform and help reunite it with its rightful owner.
             </p>
           </button>
+
+          {/* Saved Found Items Card (only for desk users) */}
+          {sessionStorage.getItem("userType") === "desk" && (
+            <button onClick={() => navigate("/saved-found")} className="action-card group text-left animate-fade-in" style={{
+            animationDelay: "0.3s"
+          }}>
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/20">
+                <Image className="h-6 w-6 text-primary" />
+              </div>
+              <h2 className="mb-2 text-xl font-semibold text-foreground">
+                Saved Found Items
+              </h2>
+              <p className="mb-3 text-sm text-primary">
+                View locally saved items
+              </p>
+              <p className="text-sm text-muted-foreground">
+                See items saved from lost & found desks or previously uploaded found items stored locally for matching.
+              </p>
+            </button>
+          )}
         </div>
 
         {/* Stats or Trust Indicators */}

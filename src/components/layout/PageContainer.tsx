@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, MapPin, User, Compass, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export function PageContainer({
   const [currentLocation, setCurrentLocation] = useState(
     sessionStorage.getItem("userLocation") || "San Francisco, CA"
   );
+  const [isLocating, setIsLocating] = useState(false);
 
   const handleBack = () => {
     if (backTo) {
@@ -61,6 +62,75 @@ export function PageContainer({
     setCurrentLocation(location);
     sessionStorage.setItem("userLocation", location);
   };
+
+  // Reverse-geocode using Nominatim (OpenStreetMap) to get a readable location
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!res.ok) {
+        console.info("Reverse geocode failed", res.status, await res.text());
+        return null;
+      }
+      const data = await res.json();
+      const addr = data?.address || {};
+      const place = addr.city || addr.town || addr.village || addr.hamlet || addr.county;
+      const state = addr.state;
+      if (place && state) return `${place}, ${state}`;
+      if (state) return state;
+      if (place) return place;
+      return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    } catch (err) {
+      console.info("Reverse geocode error", err);
+      return null;
+    }
+  };
+
+  const locateAndSetLocation = async () => {
+    if (!("geolocation" in navigator)) {
+      console.info("Geolocation not available in this browser");
+      return null;
+    }
+
+    setIsLocating(true);
+    return new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const label = await reverseGeocode(latitude, longitude);
+            if (label) {
+              handleLocationChange(label);
+            } else {
+              const fallback = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+              handleLocationChange(fallback);
+            }
+          } catch (err) {
+            console.info("Error during geolocation handling", err);
+          } finally {
+            setIsLocating(false);
+            resolve();
+          }
+        },
+        (err) => {
+          console.info("Geolocation error", err);
+          setIsLocating(false);
+          resolve();
+        },
+        { enableHighAccuracy: false, timeout: 10000 }
+      );
+    });
+  };
+
+  // Auto-run location detection once if nothing is stored yet
+  useEffect(() => {
+    const stored = sessionStorage.getItem("userLocation");
+    if (!stored) {
+      // Try to get permission and fetch a friendly location label
+      locateAndSetLocation().catch((e) => console.info("Auto-locate failed", e));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className={`min-h-screen bg-background ${className}`}>
@@ -101,13 +171,20 @@ export function PageContainer({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-1 px-2">
                     <MapPin className="h-4 w-4 text-primary" />
-                    <span className="text-sm max-w-[120px] truncate hidden sm:inline">{currentLocation}</span>
+                    <span className="text-sm max-w-[120px] truncate hidden sm:inline">{isLocating ? "Locating..." : currentLocation}</span>
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>Select Location</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+
+                  <DropdownMenuItem onClick={locateAndSetLocation} className={isLocating ? "opacity-60 pointer-events-none" : ""}>
+                    {isLocating ? "Detecting current location..." : "Use current location"}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
                   {locations.map((location) => (
                     <DropdownMenuItem 
                       key={location} 
